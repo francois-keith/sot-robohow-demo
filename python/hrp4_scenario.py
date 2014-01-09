@@ -14,6 +14,7 @@ from dynamic_graph.ros import *
 # Create a simple kinematic solver.
 from dynamic_graph.sot.dyninv import SolverKine
 from dynamic_graph.sot.application.velocity.precomputed_tasks import initialize
+solver = initialize ( robot, SolverKine )
 
 from dynamic_graph.sot.core.meta_tasks_kine import *
 from dynamic_graph.sot.core.meta_task_generic import MetaTaskGeneric
@@ -28,90 +29,7 @@ from dynamic_graph.sot.expression_graph.types import *
 from dynamic_graph.sot.expression_graph.functions import *
 from dynamic_graph.sot.expression_graph.gripper import Gripper
 
-
-
-# --- PG ---------------------------------------------------------
-from dynamic_graph import plug
-from dynamic_graph.sot.core.math_small_entities import Derivator_of_Matrix, Inverse_of_matrixHomo, Multiply_of_matrixHomo, Stack_of_vector, PoseRollPitchYawToMatrixHomo, MatrixHomoToPoseRollPitchYaw, Multiply_matrixHomo_vector
-from dynamic_graph.sot.dynamics import Dynamic
-import dynamic_graph.script_shortcuts
-from dynamic_graph.script_shortcuts import optionalparentheses
-from dynamic_graph.matlab import matlab
-from dynamic_graph.sot.core import *
-from dynamic_graph.sot.dynamics import *
-from dynamic_graph.sot.core.meta_task_6d import MetaTask6d,toFlags
-from dynamic_graph.sot.pattern_generator import PatternGenerator,Selector
-from dynamic_graph.sot.core.matrix_util import matrixToTuple
-# from dynamic_graph.sot.core import FeatureGeneric, FeaturePoint6d, Task, TaskPD
-from dynamic_graph.sot.core import FeaturePosture
-
-
-
-from dynamic_graph import plug
-from dynamic_graph.sot.core import *
-from dynamic_graph.sot.core.math_small_entities import Derivator_of_Matrix
-from dynamic_graph.sot.core import feature_vector3
-from dynamic_graph.sot.dynamics import *
-from dynamic_graph.sot.dyninv import *
-import dynamic_graph.script_shortcuts
-from dynamic_graph.script_shortcuts import optionalparentheses
-from dynamic_graph.matlab import matlab
-from dynamic_graph.sot.core.matrix_util import matrixToTuple, vectorToTuple,rotate, matrixToRPY
-from dynamic_graph.sot.core.meta_task_6d import MetaTask6d,toFlags
-from dynamic_graph.sot.core.meta_tasks import setGain
-from dynamic_graph.sot.core.meta_tasks_kine import *
-from dynamic_graph.sot.core.meta_task_posture import MetaTaskKinePosture
-from dynamic_graph.sot.core.meta_task_visual_point import MetaTaskVisualPoint
-from dynamic_graph.sot.core.utils.attime import attime,ALWAYS,refset,sigset
-from numpy import *
-
-
-
-from numpy import *
-def totuple( a ):
-    al=a.tolist()
-    res=[]
-    for i in range(a.shape[0]):
-        res.append( tuple(al[i]) )
-    return tuple(res)
-
-from dynamic_graph.sot.core.matrix_util import matrixToTuple, vectorToTuple,rotate, matrixToRPY
-#headMcam=array([[0.0,0.0,1.0,0.081],[1.,0.0,0.0,0.072],[0.0,1.,0.0,0.031],[0.0,0.0,0.0,1.0]])
-headMcam=array([[0.0,0.0,1.0,0],[1.,0.0,0.0,0],[0.0,1.,0.0,0],[0.0,0.0,0.0,1.0]])
-# headMcam = dot(headMcam,rotate('x',10*pi/180))
-
-
-# --- FOV ---
-def createFoVTasks(robot):
-  taskFoV = MetaTaskVisualPoint('FoV',robot.dynamic,'head','gaze')
-  taskFoV.opmodif = matrixToTuple(headMcam)
-
-  taskFoV.task=TaskInequality('taskFoVineq')
-  taskFoV.task.add(taskFoV.feature.name)
-  [Xmax,Ymax]=[0.38,0.28]
-  taskFoV.task.referenceInf.value = (-Xmax,-Ymax)    # Xmin, Ymin
-  taskFoV.task.referenceSup.value = (Xmax,Ymax)  # Xmax, Ymax
-  taskFoV.task.dt.value=5e-3
-  taskFoV.task.controlGain.value=0.01
-  taskFoV.featureDes.xy.value = (0,0)
-  rightWristPosition = MatrixHomoToPose('rightWristPosition')
-  plug(robot.frames['rightGripper'].position, rightWristPosition.sin)
-
-  # taskFoV.goto3D((0,-1.1,0.9))
-  #rightWristPosition.sout.recompute(1)
-  #taskFoV.goto3D(rightWristPosition.sout.value)
-  plug(rightWristPosition.sout, taskFoV.target)
-  return taskFoV.task
-
-solver = initialize ( robot, SolverKine )
-
-
-from numpy.linalg import norm
-
-""" Return the norm of the error of a task """
-def getError(task):
-	return norm(array(task.error.value))
-
+from dynamic_graph.sot.robohow.tools import *
 
 class Scenario:
   solver = None
@@ -137,44 +55,13 @@ class Scenario:
     self.stepIndex = 0
     self.solver = solver
 
-    # --- TASK POSTURE --------------------------------------------------
-    # set a default position for the joints.
-    robot.features['featurePosition'] = FeaturePosture('featurePosition')
-    plug(robot.device.state,robot.features['featurePosition'].state)
-    robotDim = len(robot.dynamic.velocity.value)
-    robot.features['featurePosition'].posture.value = robot.halfSitting
 
-    if robot.device.name == 'HRP2LAAS' or \
-       robot.device.name == 'HRP2JRL':
-      postureTaskDofs = [ False,False,False,False,False,False, \
-                          False,False,False,False,False,False, \
-                          True,True,True,True, \
-                          True,True,True,True,True,True,True, \
-                          True,True,True,True,True,True,True ]
-    elif robot.device.name == 'HRP4LIRMM':
-      # Right Leg, Left leg, chest, right arm, left arm
-      postureTaskDofs = [False]*6 +  [False]*6 + [True]*4 + [False]*9 + [True]*9
-    elif robot.device.name == 'ROMEO':
-      # chest, left/right arms, left/right legs
-      postureTaskDofs = [True]*5 + [True]*7 + [True]*7 + [False]*7 + [False]*7
-    else:
-      print "/!\\ walking.py: The robot " +robot.device.name+ " is unknown."
-      print "  Default posture task froze all the dofs"
-      postureTaskDofs=[True] * (robot.dimension-6)
-
-    for dof,isEnabled in enumerate(postureTaskDofs):
-      robot.features['featurePosition'].selectDof(dof+6,isEnabled)
-
-    robot.tasks['robot_task_position']=Task('robot_task_position')
-    robot.tasks['robot_task_position'].add('featurePosition')
-    # featurePosition.selec.value = toFlags((6,24))
-
-
-    gainPosition = GainAdaptive('gainPosition')
-    gainPosition.set(0.1,0.1,125e3)
-    gainPosition.gain.value = 5
-    plug(robot.tasks['robot_task_position'].error,gainPosition.error)
-    plug(gainPosition.gain,robot.tasks['robot_task_position'].controlGain)
+    # ---- Humanoid specific tasks ---------------------------------------------
+    # remove the com task, fix the waist instead
+    robot.waist.selec.value = '111111'
+    robot.tasks ['waist'].controlGain.value = 200
+    solver.sot.remove('robot_task_com')
+    solver.push(robot.tasks ['waist'])
 
 
     # --- CONTACTS
@@ -185,7 +72,9 @@ class Scenario:
         contact.gain.setConstant(10)
         contact.keep()
         locals()['contact'+name] = contact
-    # ---- TASKS -------------------------------------------------------------------
+
+
+    # ---- TASKS ---------------------------------------------------------------
 
     # Constrain the rotation of the bottle for the pouring task : 
     # 90* => the Z axis of the world and the Z axis of the bottle are colinear
@@ -211,6 +100,7 @@ class Scenario:
     self.features['positionZ'].selec.value ='100' #TODO
     self.features['positionZ'].reference.value = (0,)
 
+
     #######################################################
     ## position of the bottle above the target.
     ## inequality task: we want the bottle to be above the recipient
@@ -226,6 +116,7 @@ class Scenario:
     self.tasks['positionXY'].referenceInf.value = (-0.05,-0.05)
     self.tasks['positionXY'].referenceSup.value = ( 0.05, 0.05)
 
+
     #######################################################
     # define a task for the orientation of the fingertips : parallel to the handle
     # line / line constraint
@@ -234,11 +125,6 @@ class Scenario:
     self.createTask('tips', 'ground_x', 'r_gripper_y', 'angle', lowerBound = (2.5), upperBound = (2.5))
 
     self.r_gripper_angle = Gripper('r_gripper_angle', robot, 29, 2)
-
-
-		## ....
-    robot.featureComDes.errorIN.value = (0.05, 0.0, 0.8)
-
 
     ## position task of the hand
     # ---- TASK GRIP ---
@@ -249,6 +135,10 @@ class Scenario:
     target=(0.25,-0.2,0.9, -1.5, -1.3, 1.3)
     gotoNd(self.taskRH,target,'111111',(4.9,0.9,0.01,0.9))
     self.tasks['taskRH'] = self.taskRH.task
+
+    # create FoV task
+    self.tasks['FoV'] = createFoVTasks(robot)
+
 
   """ create a task """
   def createTask(self, name, expr1, expr2, taskType, lowerBound, upperBound, gain=1):
@@ -270,15 +160,9 @@ class Scenario:
     self.features[name] = feature
 
 
-    # create FoV task
-    self.tasks['FoV'] = createFoVTasks(robot)
-
-
-
-  ## sequencing...
+  ## shortcut for the pouring taks
   def pour(self, angle=45):
     self.features['bottleZ'].reference.value = radians(angle)
-
 
   # graps
   def _step1(self):
@@ -376,27 +260,5 @@ def inc():
 
 runner=inc()
 [go,stop,next,n]=loopShortcuts(runner)
-
-
-
-
-taskComIneq = TaskInequality('taskComIneq')
-taskComIneq.add(robot.featureCom.name)
-taskComIneq.referenceInf.value = (-0.05,-0.02,-0.05)    # Xmin, Ymin
-taskComIneq.referenceSup.value = ( 0.05, 0.02,0.05)    # Xmin, Ymin
-taskComIneq.dt.value=0.005
-taskComIneq.controlGain.value = 0.9
-s.solver.sot.remove('robot_task_com')
-#s.solver.push(taskComIneq)
-
-def initWaistCoMTasks(robot):
-  # Controlling also the yaw.
-  robot.waist.selec.value = '111111'
-
-  robot.tasks ['waist'].controlGain.value = 200
-
-
-initWaistCoMTasks(robot)
-s.solver.push(robot.tasks ['waist'])
 
 go
