@@ -66,30 +66,46 @@ class CylinderPouring
 
  public: /* --- SIGNAL --- */
 
-	// remaining volume in the container (estimated)
-  //dg::SignalTimeDependent<double,int> estimatedVolume;
+  // Angle between the normal of the cylinder and the gound z axis
+  dg::SignalPtr<ml::Vector,int> angleSIN;
 
-	// desired angle for the container.
-  dg::SignalPtr<double,int> volumeDesSIN;
-  dg::SignalTimeDependent<double,int> angle;
+  // volume remaining in the bottle
+  // max (current volume in the bottle, volume possible due to inclination)
+  // Litre
+  dg::SignalTimeDependent<double,int> volumeSOUT;
+
+  // required angle to pour a given quantity of liquid
+  dg::SignalPtr<double,int> thetaTargetSOUT;
 
  public: /* --- FUNCTIONS --- */
   double & computeTheta( double& res, const int& time );
 
+  //
+  double computeRemainingVolume(double angle) const;
+  double& computeRemainingVolume(double&  res, const int & time);
+  double computeAngleToPour(double volumeDes);
+
+  void pour(const double & volume);
+  void test2 ();
+
+  void printVolume();
+
+  double computeMaxVolume() const;
   void setHeight(const double & h);
   void setRadius(const double & r);
   void setVolume(const double & v);
   void initCommands();
 
+  void display();
  private:
 
-	// volume of liquid.
-	double volume_;
+  // volume of liquid.
+  double volume_;
 
-	// height
-	double height_;
+  // height
+  double height_;
 
-	double radius_;
+  double radius_;
 };
 
 
