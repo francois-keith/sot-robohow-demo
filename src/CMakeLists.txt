@@ -32,3 +32,10 @@ DYNAMIC_GRAPH_PYTHON_MODULE("sot/robohow/${PYTHON_LIBRARY_NAME}"
   ${PYTHON_LIBRARY_NAME}-wrap
   )
 
+# Install empty __init__.py files in intermediate directories.
+INSTALL(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_graph/sot/robohow/__init__.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/dynamic_graph/sot/robohow/gripper.py
+  DESTINATION ${PYTHON_SITELIB}/dynamic_graph/sot/robohow
+  )
+
