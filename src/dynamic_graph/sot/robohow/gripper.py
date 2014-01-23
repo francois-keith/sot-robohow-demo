@@ -1,5 +1,4 @@
 from dynamic_graph.sot.core.meta_tasks_kine import *
-from dynamic_graph.sot.core.meta_task_generic import MetaTaskGeneric
 
 from numpy import *
 def totuple( a ):
