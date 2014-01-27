@@ -13,54 +13,58 @@ A wrapper class for the gripper
 """
 class Gripper: 
 
-	feature = None
-	featureDes = None
-	task = None
+  feature = None
+  featureDes = None
+  task = None
 
-	"""
-	name:
-	robot the robot
-	index: index of the first gripper value in the state vector
-	dim: dimension of the gripper
-	"""
-	def __init__(self, name, robot, index, dim = 1):
-		self.feature = FeatureGeneric('feature'+name)
-		self.featureDes = FeatureGeneric('featureDes'+name)
-		self.feature.setReference('featureDes'+name)
-		self.featureDes.errorIN.value = (0,) * dim;
+  """
+  name:
+  robot the robot
+  index: index of the first gripper value in the state vector
+  dim: dimension of the gripper
+  """
+  def __init__(self, name, robot, indexes):
+    dim=len(indexes)
+    self.feature = FeatureGeneric('feature'+name)
+    self.featureDes = FeatureGeneric('featureDes'+name)
+    self.feature.setReference('featureDes'+name)
+    self.featureDes.errorIN.value = (0,) * dim;
 
-		# create jacobian.
-		jacobianGripper = eye(dim,robot.dimension) * 0;
-		jacobianGripper[0][index] = 1;
-		jacobianGripper[1][index+1] = 1;
-		self.feature.jacobianIN.value = jacobianGripper
+    # create jacobian.
+    jacobianGripper = eye(dim,robot.dimension) * 0;
+    position=0
+    for index in indexes:
+      jacobianGripper[position][index] = 1;
+      ++position
+#    jacobianGripper[1][index+1] = 1;
+    self.feature.jacobianIN.value = jacobianGripper
 
-		# only selec some dofs
-		selecRightGripper = Selec_of_vector('selecRightGripper')
-		selecRightGripper.selec(index, index+dim)
-		plug(robot.dynamic.position, selecRightGripper.sin)
-		plug(selecRightGripper.sout, self.feature.errorIN)
+    # only selec some dofs
+    selecRightGripper = Selec_of_vector('selecRightGripper')
+    selecRightGripper.selec(index, index+dim)
+    plug(robot.dynamic.position, selecRightGripper.sin)
+    plug(selecRightGripper.sout, self.feature.errorIN)
 
-		# 2\ Define the task. Associate to the task the position feature.
-		self.task = Task('task'+name)
-		self.task.add('feature'+name)
-		self.task.controlGain.value = 1
+    # 2\ Define the task. Associate to the task the position feature.
+    self.task = Task('task'+name)
+    self.task.add('feature'+name)
+    self.task.controlGain.value = 1
 
-	"""
+  """
   ... hard coded for hrp4. #TODO
-	"""
-	def open(self):
-		pos = self.featureDes.errorIN.value
-		self.featureDes.errorIN.value=(pos[0], 0)
+  """
+  def open(self):
+    pos = self.featureDes.errorIN.value
+    self.featureDes.errorIN.value=(pos[0], 0)
 
-	"""
-	... hard coded for hrp4. #TODO
-	"""
-	def close(self):
-		pos = self.featureDes.errorIN.value
-		self.featureDes.errorIN.value=(pos[0], 1)
+  """
+  ... hard coded for hrp4. #TODO
+  """
+  def close(self):
+    pos = self.featureDes.errorIN.value
+    self.featureDes.errorIN.value=(pos[0], 1)
 
-	def set(self, position):
-		initpos = self.featureDes.errorIN.value 
-		self.featureDes.errorIN.value = position
+  def set(self, position):
+    initpos = self.featureDes.errorIN.value 
+    self.featureDes.errorIN.value = position
 

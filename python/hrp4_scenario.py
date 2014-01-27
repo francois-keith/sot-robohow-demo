@@ -3,19 +3,6 @@
 import numpy
 from math import radians
 
-#from dynamic_graph.sot.core.meta_tasks_kine import *
-# Create the robot romeo.
-from dynamic_graph.sot.hrp4.sot_hrp4_controller import *
-from dynamic_graph.sot.hrp4.prologue import *
-
-# Binds with ROS. assert that roscore is running.
-from dynamic_graph.ros import *
-
-# Create a simple kinematic solver.
-from dynamic_graph.sot.dyninv import SolverKine
-from dynamic_graph.sot.application.velocity.precomputed_tasks import initialize
-solver = initialize ( robot, SolverKine )
-
 from dynamic_graph.sot.core.meta_tasks_kine import *
 
 ################################################################################
@@ -48,6 +35,7 @@ def createBottle():
 # TODO : externalize
 def estimateBottleFrame():
   BaseElement.frames['bottle'] = ((1,0,0,0.3), (0,1,0,-0.27), (0,0,1,1), (0,0,0,1))
+#  BaseElement.frames['bottle'] = ((1,0,0,0.3), (0,1,0,-0.27), (0,0,1,0.7), (0,0,0,1))
 
 def estimateCupFrame():
   BaseElement.frames['cup'] = ((1,0,0,0.3), (0,1,0,0.), (0,0,1,1), (0,0,0,1))
@@ -59,7 +47,7 @@ def estimateBottleFrameInHand(robot):
   # of the bottle.
   bungFrame = OpPointModifier('bung')
   #TODO find the correct Z, position of the bung in the frame of the hand
-  bungFrame.setTransformation(((1,0,0,0.0), (0,1,0,0.0), (0,0,1,-0.10), (0,0,0,1)))
+  bungFrame.setTransformation(((1,0,0,0.0), (0,1,0,0.0), (0,0,1,0.10), (0,0,0,1)))
   plug(robot.frames['rightGripper'].position, bungFrame.positionIN)
   plug(robot.frames['rightGripper'].jacobian, bungFrame.jacobianIN)
 #  frame.position.recompute(bungFrame.position.time + 1)
@@ -70,7 +58,6 @@ def estimateBottleFrameInHand(robot):
 bottle = createBottle()
 estimateBottleFrame()
 estimateCupFrame()
-estimateBottleFrameInHand(robot)
 
 ## FSM
 from collections import namedtuple
@@ -79,6 +66,7 @@ Step = namedtuple('step', ['add', 'rm'])
 
 """ ... """
 class Scenario:
+  robot  = None
   solver = None
   stepIndex = 0
 
@@ -104,27 +92,30 @@ class Scenario:
   steps = []
 
   def __init__(self, robot, solver):
-    ros = Ros(robot)
     self.stepIndex = -1
+    self.robot = robot
     self.solver = solver
+    solver.sot.damping.value = 1e-2
+    estimateBottleFrameInHand(robot)
 
 
-    # ---- Humanoid specific tasks ---------------------------------------------
-    # remove the com task, fix the waist instead
-    robot.waist.selec.value = '111111'
-    robot.tasks ['waist'].controlGain.value = 200
-    solver.sot.remove('robot_task_com')
-    solver.push(robot.tasks ['waist'])
+    if robot.device.name == "HRP4LIRMM" or robot.device.name == "romeo" :
+      # ---- Humanoid specific tasks ---------------------------------------------
+      # remove the com task, fix the waist instead
+      robot.waist.selec.value = '111111'
+      robot.tasks ['waist'].controlGain.value = 200
+      solver.sot.remove('robot_task_com')
+      solver.push(robot.tasks ['waist'])
 
 
-    # --- CONTACTS
-    # define contactLF and contactRF
-    for name,joint in [ ['LF','left-ankle'], ['RF','right-ankle' ] ]:
-        contact = MetaTaskKine6d('contact'+name,robot.dynamic,name,joint)
-        contact.feature.frame('desired')
-        contact.gain.setConstant(10)
-        contact.keep()
-        locals()['contact'+name] = contact
+      # --- CONTACTS
+      # define contactLF and contactRF
+      for name,joint in [ ['LF','left-ankle'], ['RF','right-ankle' ] ]:
+          contact = MetaTaskKine6d('contact'+name,robot.dynamic,name,joint)
+          contact.feature.frame('desired')
+          contact.gain.setConstant(10)
+          contact.keep()
+          locals()['contact'+name] = contact
 
 
     # --- TASK POSTURE --------------------------------------------------
@@ -136,12 +127,21 @@ class Scenario:
 
     # 'HRP4LIRMM':
     # Right Leg, Left leg, chest, right arm, left arm
-    postureTaskDofs = [False]*6 +  [False]*6 + [False]*4 \
+    if robot.device.name == "HRP4LIRMM":
+      postureTaskDofs = [False]*6 +  [False]*6 + [False]*4 \
         + [False]*1 + [True]*1 + [False]*7  \
         + [False]*1 + [True]*1 + [False]*7 
+    elif robot.device.name == "romeo":
+      postureTaskDofs = [False]*5 \
+        + [False]*1 + [True]*1 + [False]*5  \
+        + [False]*1 + [True]*1 + [False]*5  \
+        + [False]*7 + [False]*7 
+    else:
+      print "dafuq " + robot.device.name
 
-    for dof,isEnabled in enumerate(postureTaskDofs):
-      robot.features['featurePosition'].selectDof(dof+6,isEnabled)
+    if robot.device.name == "HRP4LIRMM" or robot.device.name == "romeo" :
+      for dof,isEnabled in enumerate(postureTaskDofs):
+        robot.features['featurePosition'].selectDof(dof+6,isEnabled)
       
     robot.tasks['robot_task_position']=TaskInequality('robot_task_position')
     robot.tasks['robot_task_position'].add('featurePosition')
@@ -159,7 +159,7 @@ class Scenario:
     # 1st feature: Plane (x,y) _|_ bottleZ
     self.addExpressions(VersorElement('r_gripper_z', robot, 'rightGripper', versor = (0,0,-1) ))
     self.addExpressions(VersorElement('bottle_z', robot, 'bottle', versor = (0,0,1) ) )
-    self.createTask('angle-gripperZ_bottleZ', 'r_gripper_z', 'bottle_z', 'angle', lowerBound = 0, upperBound = 0)
+    self.createTask('angle-gripperZ_bottleZ', 'r_gripper_z', 'bottle_z', 'angle', lowerBound = radians(180), upperBound = radians(180))
 
 
 #    self.addExpressions(VersorElement('r_gripper_x', robot, 'rightGripper', versor = (1,0,0) ))
@@ -238,7 +238,11 @@ class Scenario:
 
 #    self.steps.append(Step(add=['gripperX_axis'], rm=[]))
 #    self.steps.append(Step(add=['angle-gripperZ_bottleZ'], rm=[]))
+
+#    self.steps.append(Step(add=['angle-gripperZ_bottleZ'], rm=[]))
     self.steps.append(Step(add=['position-gripper_bottle', 'angle-gripperZ_bottleZ'], rm=[]))
+
+
 #    self.steps.append(Step(add=['gripperX_axis'], rm=[]))
 
 
@@ -304,7 +308,15 @@ class Scenario:
     self.addExpressions(VersorElement('ground_x', robot, 'ground', versor = (1,0,0)))
     self.createTask('tips', 'ground_x', 'r_gripper_y', 'angle', lowerBound = (2.5), upperBound = (2.5))
 
-    self.r_gripper_angle = Gripper('r_gripper-opening', robot, 29, 2)
+    # TODO
+    if robot.device.name == "HRP4LIRMM":
+      self.r_gripper_angle = Gripper('r_gripper-opening', robot, [29,30])
+    elif robot.device.name == "romeo":
+      self.r_gripper_angle = Gripper('r_gripper-opening', robot, [26,27])
+    else:
+      self.r_gripper_angle = Gripper('r_gripper-opening', robot, [28,29,32,33, 43,44, 47,48])
+      print "dafuq " + robot.device.name
+
 
     ## position task of the hand
     # ---- TASK GRIP ---
@@ -321,6 +333,10 @@ class Scenario:
 
     # create FoV task
     self.tasks['FoV'] = createFoVTasks(robot)
+
+    if robot.device.name != "HRP4LIRMM" and robot.device.name != "romeo":
+      targetRoot = (0,0,0,0,0,0)
+      gotoNd(robot.tasks['contact'],targetRoot,'011100',(4.9,0.9,0.01,0.9))
 
 
   """ insert an expression into the associated dictionnary """
@@ -354,7 +370,7 @@ class Scenario:
   ## shortcut for the pouring taks
   def pour(self, vol):
     plug(self.features['angle-pouring'].error, bottle.angle)
-    bottle.volume.recompute(robot.device.state.time)
+    bottle.volume.recompute(self.solver.sot.control.time)
     bottle.pour(vol)
     self.features['angle-pouring'].reference.value = bottle.targetAngle.value
 
@@ -372,11 +388,12 @@ class Scenario:
     self.seqStep()
 
   def _step1(self):
-    self.solver.push(self.r_gripper_angle.task)
-    self.r_gripper_angle.featureDes.errorIN.value = (1,0)
+    print "task"
+    #fk self.solver.push(self.r_gripper_angle.task)
+    #fk self.r_gripper_angle.featureDes.errorIN.value = (1,0)
     
     # update the criticalTask
-    self.criticalTask = self.r_gripper_angle.task
+    #fk self.criticalTask = self.r_gripper_angle.task
 #self.tasks['angle-pouring']
 
   # close the gripper
@@ -390,10 +407,10 @@ class Scenario:
   # bent the bottle a little
   def _step2a(self):
     print "grasping"
-    self.r_gripper_angle.featureDes.errorIN.value = (1,0.4)
+    #fk self.r_gripper_angle.featureDes.errorIN.value = (1,0.4)
 #    self.r_gripper_angle.close()
     # update the criticalTask
-    self.criticalTask = self.r_gripper_angle.task
+    #fk self.criticalTask = self.r_gripper_angle.task
 
     # replace the task controlling the orientation of the bottle by the pouring one.
     self.solver.remove(self.tasks['angle-gripperZ_bottleZ'])
@@ -416,7 +433,7 @@ class Scenario:
     self.solver.sot.down('robot_task_angle-pouring')
     self.solver.sot.down('robot_task_angle-pouring')
     self.solver.sot.down('robot_task_angle-pouring')
-    self.solver.push(self.tasks['FoV'])
+#    self.solver.push(self.tasks['FoV'])
 
     # update the criticalTask
 #    self.criticalTask = (self.tasks['r_gripperXY'], self.tasks['r_gripperZ'], \
@@ -426,13 +443,14 @@ class Scenario:
   # pour a little
   def _step4(self):
     print "Pouring more"
-    self.pour(0.1)
+    self.pourRaw(100)
+#    self.pour(0.1)
     self.criticalTask = self.tasks['angle-pouring']
 
   # pour ...
   def _step5(self):
     print "And more"
-    self.pourRaw(25)
+    self.pourRaw(115)
     self.criticalTask = self.tasks['angle-pouring']
 
   def _step6(self):
@@ -444,11 +462,11 @@ class Scenario:
 #    self.solver.remove(self.tasks['angle-pouring'])
     self.features['angle-pouring'].reference.value = radians(85)
     self.solver.push(self.tasks['taskRH'])
-    self.solver.sot.up(s.tasks['taskRH'].name)
+    self.solver.sot.up(self.tasks['taskRH'].name)
 
     mhpo = MatrixHomoToPose('mhpo')
-    plug(robot.rightWrist.position, mhpo.sin)
-    mhpo.sout.recompute(robot.rightWrist.position.time)
+    plug(self.robot.rightWrist.position, mhpo.sin)
+    mhpo.sout.recompute(self.robot.rightWrist.position.time)
     target=mhpo.sout.value
     gotoNd(self.taskRH,target,'111',(4.9,0.9,0.01,0.9))
 
@@ -499,7 +517,7 @@ class Scenario:
       self._step9()
     self.stepIndex = self.stepIndex + 1
     print self.stepIndex
-    print solver
+    print self.solver
 
 
   def seqStep(self):
@@ -518,5 +536,4 @@ class Scenario:
     if(err < 0.001):
        self.step()
 
-s = Scenario(robot, solver)
 
