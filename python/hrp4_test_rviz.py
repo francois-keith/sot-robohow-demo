@@ -26,6 +26,12 @@ from dynamic_graph.sot.application.velocity.precomputed_tasks import initialize
 from dynamic_graph.sot.dyninv import SolverKine
 solver = initialize ( robot, SolverKine )
 
+robot.frames['l_gripper'] = robot.frames['leftGripper']
+robot.frames['r_gripper'] = robot.frames['rightGripper']
+
+#robot.frames['r_gripper'] = robot.frames['rightGripper']
+
+
 #-------------------------------------------------------------------------------
 #----- MAIN LOOP ---------------------------------------------------------------
 #-------------------------------------------------------------------------------

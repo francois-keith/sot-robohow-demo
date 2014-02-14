@@ -1,5 +1,6 @@
 #from dynamic_graph.sot.core.meta_tasks_kine import *
 # Create the robot romeo.
+from dynamic_graph.sot.dynamics.angle_estimator  import AngleEstimator
 from dynamic_graph.sot.hrp4.sot_hrp4_controller import *
 from dynamic_graph.sot.hrp4.prologue import *
 
@@ -15,6 +16,7 @@ from dynamic_graph.sot.dyninv import TaskInequality, TaskJointLimits
 from dynamic_graph.sot.core.meta_task_visual_point import MetaTaskVisualPoint
 
 from dynamic_graph.sot.application.velocity.precomputed_tasks import Solver, createCenterOfMassFeatureAndTask, createOperationalPointFeatureAndTask, initializeSignals
+from dynamic_graph.sot.robohow.cylinder_pouring import CylinderPouring, Superviser
 
 
 # Binds with ROS. assert that roscore is running.
@@ -25,6 +27,9 @@ ros = Ros(robot)
 from dynamic_graph.sot.application.velocity.precomputed_tasks import initialize
 from dynamic_graph.sot.dyninv import SolverKine
 solver = initialize ( robot, SolverKine )
+
+superviser = Superviser('superviser')
+superviser.setSoT(solver.sot.name)
 
 
 from dynamic_graph.sot.robohow.hrp4_scenario import *
