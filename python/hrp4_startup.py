@@ -10,11 +10,12 @@ from dynamic_graph.sot.core.meta_tasks_kine import MetaTaskKine6d
 from dynamic_graph.sot.dyninv import TaskInequality, TaskJointLimits
 from dynamic_graph.sot.robohow.tools import *
 from dynamic_graph.sot.robohow.gripper import Gripper
-from dynamic_graph.sot.robohow.cylinder_pouring import CylinderPouring, Superviser
+from dynamic_graph.sot.robohow.cylinder_pouring import CylinderPouring
 from dynamic_graph.sot.expression_graph.types import BaseElement
 from dynamic_graph.sot.expression_graph.types import *
 from dynamic_graph.sot.expression_graph.expression_graph import *
 from dynamic_graph.sot.expression_graph.functions import *
+from dynamic_graph.sot.robohow.superviser import *
 
 
 # Binds with ROS. assert that roscore is running.
@@ -27,12 +28,15 @@ from dynamic_graph.sot.dyninv import SolverKine
 #from dynamic_graph.sot.application.velocity.precomputed_tasks import initialize
 #solver = initialize ( robot, SolverKine )
 
+# load the initialization prototype for the pr2
 from dynamic_graph.sot.pr2.pr2_tasks import *
 solver = initialize(robot, SolverKine)
 
+# allows the publication of the velocity in the JointState message
+plug(solver.jointLimitator.control, ros.rosPublish.velocity)
 
-superviser = Superviser('superviser')
-superviser.setSoT(solver.sot.name)
+superviser = Superviser(robot, solver, ros.rosPublish)
+superviser.synchronize()
 
 # Additional frames.
 robot.frames['l_gripper'] = robot.frames['leftGripper']
@@ -60,7 +64,7 @@ def estimateCupFrame():
   BaseElement.frames['cup'] = ((1,0,0,0.3), (0,1,0,0.), (0,0,1,1), (0,0,0,1))
 #  BaseElement.frames['cup'] = ((1,0,0,0.5), (0,1,0,0.), (0,0,1,0.7), (0,0,0,1))
 
-# ...
+# TODO...
 def estimateBottleFrameInHand(robot):
   # consider the difference of position between the bottle and the hand.
   # starting from that, define the robot (frame) corresponding to the top
