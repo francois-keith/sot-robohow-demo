@@ -9,7 +9,6 @@ taskname:  the task name
 def startPublishingError(robot,publisher,taskname):
   if publisher == None:
     return
-  #print ' *** publishing ', taskname
 
   # verify that the task exists in the robot database
   if taskname in robot.tasks:
@@ -40,19 +39,16 @@ class Superviser:
   solver = None
   publisher = None
   desiredStack = [] # desired state of the stack of tasks
-  currentStack = [] # current state of the stack of tasks
 
   def __init__(self, robot, solver, publisher):
     self.robot = robot
     self.solver = solver
     self.publisher = publisher
 
-
-  """synchronize the current stack with the actual stack of tasks """
-  """TODO: for now, clears the SOT"""
-  def synchronize(self):
-    self.solver.sot.clear()
-    self.currentStack = [];
+  def getCurrentStack(self):
+    taskList = self.solver.sot.getTaskList()
+    currentStack = taskList.split('|')
+    return currentStack
 
   """clear the list of desired task"""
   def clear(self):
@@ -65,7 +61,7 @@ class Superviser:
 
   """display the state of the desired stack"""
   def dispCurrent(self):
-    for name in self.currentStack:
+    for name in self.getCurrentStack():
       print name
 
   def dispDesired(self):
@@ -77,18 +73,19 @@ class Superviser:
   def update(self):
     # builds the list of operations required
     index = 0
+    currentStack = self.getCurrentStack()
     while (index < len(self.desiredStack)):
       # identical task
-      if len(self.currentStack) > index and self.currentStack[index] == self.desiredStack[index]:
+      if len(currentStack) > index and currentStack[index] == self.desiredStack[index]:
         index = index + 1
       # the task exists in b, but not at the same place
-      elif self.desiredStack[index] in self.currentStack:
+      elif self.desiredStack[index] in currentStack:
         # one task has been removed
-        if len(self.currentStack) > index and not self.currentStack[index] in self.desiredStack:
-          taskname = self.currentStack[index]
+        if len(currentStack) > index and not currentStack[index] in self.desiredStack:
+          taskname = currentStack[index]
           stopPublishingError(self.publisher, taskname)
           self.solver.sot.remove(taskname)
-          self.currentStack.remove(taskname)
+          currentStack.remove(taskname)
 
         # the priority of the task desiredStack_[index] has changed
         else:
@@ -96,8 +93,8 @@ class Superviser:
           index2=currentStack.index(task)
           for i in range(index, index2):
             self.solver.sot.up(taskname)
-          self.currentStack.remove(taskname)
-          self.currentStack.insert(index,taskname)
+          currentStack.remove(taskname)
+          currentStack.insert(index,taskname)
           index = index + 1
 
       # the task is not in the real stack: add it
@@ -106,15 +103,15 @@ class Superviser:
         self.solver.sot.push(taskname)
         startPublishingError(self.robot,self.publisher,taskname)
 
-        for i in range(index, len(self.currentStack)):
+        for i in range(index, len(currentStack)):
           self.solver.sot.up(taskname)
-        self.currentStack.insert(index,taskname)
+        currentStack.insert(index,taskname)
         index = index+1
     
     # Now, we should have current = [desiredStack_, some tasks], we remove the remaining tasks.
-    while (index < len(self.currentStack)):
-      taskname = self.currentStack[index]
+    while (index < len(currentStack)):
+      taskname = currentStack[index]
       stopPublishingError(self.publisher, taskname)
       self.solver.sot.remove(taskname)
-      self.currentStack.remove(taskname)
+      currentStack.remove(taskname)
 
