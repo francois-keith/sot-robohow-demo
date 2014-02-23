@@ -456,7 +456,7 @@ class Scenario:
 
   def _step6(self):
     self.solver.remove(self.robot.tasks['FoV'])
-#    self.solver.remove(self.tasks['tips'])
+    self.solver.remove(self.robot.tasks['tips'])
 #    self.solver.remove(self.tasks['angle-gripperY_in_ground_plane'])
     self.solver.remove(self.robot.tasks['position-bung_Z'])
     self.solver.remove(self.robot.tasks['position-bung_XY'])

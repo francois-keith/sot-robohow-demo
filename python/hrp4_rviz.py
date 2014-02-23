@@ -16,8 +16,6 @@ from dynamic_graph.sot.dyninv import TaskInequality, TaskJointLimits
 from dynamic_graph.sot.core.meta_task_visual_point import MetaTaskVisualPoint
 
 from dynamic_graph.sot.application.velocity.precomputed_tasks import Solver, createCenterOfMassFeatureAndTask, createOperationalPointFeatureAndTask, initializeSignals
-from dynamic_graph.sot.robohow.cylinder_pouring import CylinderPouring, Superviser
-
 
 # Binds with ROS. assert that roscore is running.
 from dynamic_graph.ros import *
@@ -27,10 +25,6 @@ ros = Ros(robot)
 from dynamic_graph.sot.application.velocity.precomputed_tasks import initialize
 from dynamic_graph.sot.dyninv import SolverKine
 solver = initialize ( robot, SolverKine )
-
-superviser = Superviser('superviser')
-superviser.setSoT(solver.sot.name)
-
 
 from dynamic_graph.sot.robohow.hrp4_scenario import *
 s = Scenario(robot, solver)
@@ -50,5 +44,4 @@ def inc():
 runner=inc()
 [go,stop,next,n]=loopShortcuts(runner)
 
-go
 
