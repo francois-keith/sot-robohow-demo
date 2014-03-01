@@ -1,5 +1,6 @@
 #TODO: define the list of symbols exported.
 from dynamic_graph import plug
+from dynamic_graph.sot.core.operator import Norm_of_vector
 
 """
 Publish the error of the associated task.
@@ -11,29 +12,54 @@ def startPublishingError(robot,publisher,taskname):
     return
 
   # verify that the task exists in the robot database
-  if taskname in robot.tasks:
+  if taskname in robot.tasks and taskname != 'taskright-wrist':
     sig_name=taskname+'_error'
-    publisher.add('vector', sig_name,'/sot/'+taskname+'_error')
+    sig_name = sig_name.replace('-', '_')
+    
+    # publishes the error
+    publisher.add('vector', sig_name,'/sot/'+sig_name)
     plug(robot.tasks[taskname].error, publisher.signal(sig_name))
 
+    # publishes the error norm
+    sig_name=sig_name+'_norm'
+    publisher.add('double', sig_name,'/sot/'+sig_name)
+    errorNorm = Norm_of_vector('op_'+sig_name)
+    plug(robot.tasks[taskname].error, errorNorm.sin)
+    plug(errorNorm.sout, publisher.signal(sig_name))
 
-def stopPublishingError(publisher, taskname):
+
+"""
+Stop the publication of the error, delete the corresponding signals
+"""
+def stopPublishingError(robot, publisher, taskname):
   if publisher == None:
     return
 
-  sig_name=taskname+'_error'
-  try:
+  if taskname in robot.tasks and taskname != 'taskright-wrist':
     # unplug the signal.
-    publisher.signal(sig_name).unplug()
-    publisher.rm(sig_name)
-  except:
-    print "signal " + sig_name + " not found"
+    sig_name=taskname+'_error'
+    sig_name = sig_name.replace('-', '_')
+
+    if publisher.hasSignal(sig_name):
+      publisher.signal(sig_name).unplug()
+      publisher.rm(sig_name)
+    else:
+      print "signal " + sig_name + " not found"
+
+    sig_name=sig_name+'_norm'
+    if publisher.hasSignal(sig_name):
+      publisher.signal(sig_name).unplug()
+      publisher.rm(sig_name)
+    else:
+      print "signal " + sig_name + " not found"
 
 
 
 
 
-""" The goal of the supervisor class is to ... """
+"""
+The goal of the supervisor class is to ... 
+"""
 class Superviser:
   robot  = None
   solver = None
@@ -59,15 +85,15 @@ class Superviser:
     self.desiredStack.append(name);
 
 
-  """display the state of the desired stack"""
+  """display the state of the current stack"""
   def dispCurrent(self):
     for name in self.getCurrentStack():
       print name
 
+  """display the state of the desired stack"""
   def dispDesired(self):
     for name in self.desiredStack:
       print name
-
 
   """replace the content of the stack by the desired list of task"""
   def update(self):
@@ -83,14 +109,14 @@ class Superviser:
         # one task has been removed
         if len(currentStack) > index and not currentStack[index] in self.desiredStack:
           taskname = currentStack[index]
-          stopPublishingError(self.publisher, taskname)
+          stopPublishingError(self.robot, self.publisher, taskname)
           self.solver.sot.remove(taskname)
           currentStack.remove(taskname)
 
         # the priority of the task desiredStack_[index] has changed
         else:
           taskname = self.desiredStack[index]
-          index2=currentStack.index(task)
+          index2=currentStack.index(taskname)
           for i in range(index, index2):
             self.solver.sot.up(taskname)
           currentStack.remove(taskname)
@@ -111,7 +137,7 @@ class Superviser:
     # Now, we should have current = [desiredStack_, some tasks], we remove the remaining tasks.
     while (index < len(currentStack)):
       taskname = currentStack[index]
-      stopPublishingError(self.publisher, taskname)
+      stopPublishingError(self.robot, self.publisher, taskname)
       self.solver.sot.remove(taskname)
       currentStack.remove(taskname)
 
