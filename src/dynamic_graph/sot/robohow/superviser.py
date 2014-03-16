@@ -12,7 +12,7 @@ def startPublishingError(robot,publisher,taskname):
     return
 
   # verify that the task exists in the robot database
-  if taskname in robot.tasks and taskname != 'taskright-wrist':
+  if taskname in robot.tasks:
     sig_name=taskname+'_error'
     sig_name = sig_name.replace('-', '_')
     
@@ -35,20 +35,18 @@ def stopPublishingError(robot, publisher, taskname):
   if publisher == None:
     return
 
-  if taskname in robot.tasks and taskname != 'taskright-wrist':
+  if taskname in robot.tasks:
     # unplug the signal.
     sig_name=taskname+'_error'
     sig_name = sig_name.replace('-', '_')
 
     if publisher.hasSignal(sig_name):
-      publisher.signal(sig_name).unplug()
       publisher.rm(sig_name)
     else:
       print "signal " + sig_name + " not found"
 
     sig_name=sig_name+'_norm'
     if publisher.hasSignal(sig_name):
-      publisher.signal(sig_name).unplug()
       publisher.rm(sig_name)
     else:
       print "signal " + sig_name + " not found"
