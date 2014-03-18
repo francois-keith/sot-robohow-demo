@@ -27,7 +27,7 @@ SETUP_PROJECT()
 # sot dependencies
 ADD_REQUIRED_DEPENDENCY("dynamic-graph")
 ADD_REQUIRED_DEPENDENCY("dynamic-graph-python")
-ADD_REQUIRED_DEPENDENCY("sot-core >= 2.7")
+ADD_REQUIRED_DEPENDENCY("sot-core >= 2.8.0-37")
 ADD_REQUIRED_DEPENDENCY("sot-dyninv")
 
 ADD_ROSPACK_DEPENDENCY("roscpp")
